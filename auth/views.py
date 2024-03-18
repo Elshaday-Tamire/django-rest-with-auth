@@ -13,7 +13,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
-from rest_framework_simplejwt.settings import api_settings
+from datetime import timedelta
+from django.utils import timezone
 
 class CustomAccessToken(AccessToken):
     def __init__(self, *args, **kwargs):
@@ -42,13 +43,24 @@ def login(request):
     if not user.check_password(password):
         return Response({"detail": "Incorrect username/password"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    refresh = RefreshToken.for_user(user)
+    # Set custom expiration time for access token (e.g., 1 hour)
+    access_token_lifetime = timedelta(hours=1)
+
+    # Calculate the expiration time by adding the lifetime to the current time
+    access_token_expires = timezone.now() + access_token_lifetime
+
+    # Generate a new access token with the custom expiration time
     custom_access_token = CustomAccessToken.for_user(user)
+    custom_access_token.set_exp(access_token_expires.timestamp())
+
+    refresh = RefreshToken.for_user(user)
 
     return Response({
         'access': str(custom_access_token),
         'refresh': str(refresh),
     })
+
+
 
 from django.contrib.auth.models import Group
 
@@ -71,8 +83,17 @@ def signup(request):
         # Save the user with updated attributes
         user.save()
 
-        # Generate custom access token
+        # Set custom expiration time for access token (e.g., 1 hour)
+        access_token_lifetime = timedelta(hours=1)
+
+        # Calculate the expiration time by adding the lifetime to the current time
+        access_token_expires = timezone.now() + access_token_lifetime
+
+        # Generate a new access token with the custom expiration time
         custom_access_token = CustomAccessToken.for_user(user)
+        custom_access_token.set_exp(access_token_expires.timestamp())
+
+        refresh = RefreshToken.for_user(user)
 
         return Response({"token": str(custom_access_token), "user": serializer.data})
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
